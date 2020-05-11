@@ -1,15 +1,10 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Threading;
 using UnityEngine;
 using UnityEngine.UI;
-using UniRx;
-using UnityEngine.SocialPlatforms.Impl;
 
 public class Tetris : MonoBehaviour
 {
-
     // active tet anchor pos
     public static int aTAP = 0;
     // screen size 
@@ -63,6 +58,9 @@ public class Tetris : MonoBehaviour
     // start position for next tet previews
     public List<Vector2> nextTetPreviewSP = new List<Vector2>();
 
+    // unity reactive code
+    private MUniRx mUniRx;
+
     public enum PieceState
     {
         Empty,
@@ -103,15 +101,16 @@ public class Tetris : MonoBehaviour
     // on floor timer
     private float oFT = 0.0F;
     float tempTimer = 0.0F;
-
-
-
-
-    // number of create preview next tet
-    private int pNT = 3;
     // create preview next tet size
     private Vector2Int pNTXY = new Vector2Int(4, 4);
 
+    private Transform mTransform;
+    private void Awake()
+    {
+        mTransform = transform;
+        mUniRx = mTransform.GetComponent<MUniRx>();
+        mTet = mTransform.GetComponent<Tetrimino>();
+    }
 
 
     void Update()
@@ -134,19 +133,19 @@ public class Tetris : MonoBehaviour
         }
 
         tempTimer += Time.deltaTime;
-        // gravity
+        // old gravity
+        /*
         if (tempTimer > 1.0F)
         {
             tempTimer -= 1.0F;
             TryDropDown();
 
-        }
+        }*/
 
     }
     private void LockTetInPlace()
     {
         ScoreMult mSM = ScoreMult.None;
-        bool didTSpin = false;
         // reset game
         if (aTAP >= 190)
         {
@@ -179,7 +178,6 @@ public class Tetris : MonoBehaviour
                         if (lockedInTSpin)
                         {
                             mSM = ScoreMult.TSpin;
-                            didTSpin = true;
                         }
                     }
                 }
@@ -291,8 +289,6 @@ public class Tetris : MonoBehaviour
             }
         }
     }
-
-
     public void TryDropDown(bool fromKey = false, bool hardDropDown = false)
     {
         if (mTetState == TetState.Falling)
@@ -309,9 +305,7 @@ public class Tetris : MonoBehaviour
     }
     public int GETATAP()
     {
-
         return aTAP;
-
     }
     public void DropDown(bool fromKey = false, bool hardDropDown = false)
     {
@@ -382,7 +376,6 @@ public class Tetris : MonoBehaviour
             }
         }
         return isAny;
-
     }
     void SizeFitScreen()
     {
@@ -396,29 +389,21 @@ public class Tetris : MonoBehaviour
         nextTetPreviewSP.Add(new Vector2(setScale * cols * -1.15f + setScale * 0.5F, yPosStart + 17.0f * setScale));
         nextTetPreviewSP.Add(new Vector2(setScale * cols * -1.15f + setScale * 0.5F, yPosStart + 12.0f * setScale));
         nextTetPreviewSP.Add(new Vector2(setScale * cols * -1.15f + setScale * 0.5F, yPosStart + 7.0f * setScale));
-        UnityEngine.Debug.Log("Screen Size: " + screenSize + " set scale: " + setScale + " yPosStart " + yPosStart);
+        //Debug.Log("Screen Size: " + screenSize + " set scale: " + setScale + " yPosStart " + yPosStart);
         mC.transform.GetChild(0).gameObject.GetComponent<RectTransform>().anchoredPosition = new Vector2(250.0f, -60.0f);
         int setFontSize = Mathf.RoundToInt(Screen.height * 0.06f);
         mC.transform.GetChild(0).gameObject.GetComponent<Text>().fontSize = setFontSize;
     }
-
     // only need to spawn pieces once
     private bool piecesSpawned = false;
     // piece total
     private int pTotal = 0;
-    private bool iSetUp = false;
+    public bool iSetUp = false;
     // parameters: dev build? canvas GO
     public void SetUp(GameObject can)
     {
-
-        mTet = transform.GetComponent<Tetrimino>();
         iSetUp = false;
-        // clear and reset elements
-        //allPP.Clear();
-        //nextTets.Clear();
         mScore = 0;
-        //allB.Clear();
-        //aPS.Clear();
         if (aPS.Count > 0)
         {
             for (int i = 0; i < aPS.Count; i++)
@@ -433,21 +418,16 @@ public class Tetris : MonoBehaviour
                 allPP[i2].GetComponent<Image>().color = Color.white;
                 allPP[i2].GetComponent<Image>().enabled = false;
             }
-
-
-
         }
         pTotal = 0;
         mC = can;
         SizeFitScreen();
-
         if (!piecesSpawned)
         {
             for (int i = 0; i < rows; i++)
             {
                 for (int i2 = 0; i2 < cols; i2++)
                 {
-                    //Console.WriteLine(i);
                     CreatePiece(new Vector2((float)i2, (float)i), Vector2.zero);
                 }
             }
@@ -457,7 +437,6 @@ public class Tetris : MonoBehaviour
                 {
                     for (int o2 = 0; o2 < pNTXY.y; o2++)
                     {
-                        //Console.WriteLine(i);
                         CreatePiece(new Vector2((float)o2, (float)o), nextTetPreviewSP[z]);
                     }
                 }
@@ -466,11 +445,7 @@ public class Tetris : MonoBehaviour
         }
         iSetUp = true;
         SpawnNewTet();
-        //aTet.Add(0);
-        // DrawGameState();
     }
-
-
     // position + overwrite start position?
     public void CreatePiece(Vector2 rPos, Vector2 ovrSP)
     {
@@ -509,11 +484,8 @@ public class Tetris : MonoBehaviour
             pTotal++;
         }
     }
-
-
     public void DrawGameState(bool forceAllRedraw = false)
     {
-
         if (mTet.mPL != null)
         {
             if (mTet.mPL.Count == 4)
@@ -525,7 +497,6 @@ public class Tetris : MonoBehaviour
                 aTet.Add(mTet.mPL[3] + aTAP);
             }
         }
-
         // clear last drawn tetrino (check for if this spot is now occupied)
         if (lTet.Count > 0)
         {
@@ -543,8 +514,6 @@ public class Tetris : MonoBehaviour
             }
             lTet.Clear();
         }
-
-
         // is there active tetrino?
         if (aTet.Count > 0)
         {
@@ -554,14 +523,12 @@ public class Tetris : MonoBehaviour
                 if (aTet[i] >= 0 && aTet[i] < allB.Count)
                 {
                     allB[aTet[i]].GetComponent<Image>().sprite = tetSprite;
-                    mTet = transform.GetComponent<Tetrimino>();
                     allB[aTet[i]].GetComponent<Image>().color = mTet.mColor;
                     lTet.Add(aTet[i]);
                 }
             }
         }
     }
-
     // spawn new tet
     private void SpawnNewTet()
     {
@@ -576,30 +543,8 @@ public class Tetris : MonoBehaviour
         mTet.lSRotS = 0;
         mTet.SetUpTet(nextTets[0], aTAP);
         nextTets.RemoveAt(0);
-
-        StartCoroutine("DisplayTetPreview");
-
-
-
+        mUniRx.DoTetPreview();
     }
-    private IEnumerator DisplayTetPreview()
-    {
-
-        while (nextTets.Count < 3 || !iSetUp)
-        {
-            yield return 0;
-        }
-        mTet = transform.GetComponent<Tetrimino>();
-
-        mTet.SetUpPreviewTet(0, nextTets[0]);
-        mTet.SetUpPreviewTet(1, nextTets[1]);
-        mTet.SetUpPreviewTet(2, nextTets[2]);
-
-    }
-
-
-
-
     private void PopulateNextTets()
     {
         // get one of each shape to add to queue
@@ -620,9 +565,7 @@ public class Tetris : MonoBehaviour
         {
             nextTets.Add(addToNextTets[i2]);
         }
-        StartCoroutine("DisplayTetPreview");
-
-
+        mUniRx.DoTetPreview();
     }
     public void MoveTet(string thisDir)
     {
@@ -697,27 +640,11 @@ public class Tetris : MonoBehaviour
             }
         }
         return isAny;
-
     }
-
     public void Rotate(string thisDir)
     {
         mTet.RotateTet(thisDir);
         DrawGameState();
-        /*
-        bool blocked = IsAnyBlockBlockedSide(thisDir);
-        if (!blocked)
-        {
-            if (thisDir == "left")
-            {
-                aTAP--;
-            }
-            else
-            {
-                aTAP++;
-            }
-            DrawGameState();
-        }*/
     }
 
     public bool CheckPieceSpaceBlocked(int checkHere)
@@ -758,9 +685,6 @@ public class Tetris : MonoBehaviour
 
             mLocs.Add(addThis);
         }
-
-        //UnityEngine.Debug.Log("SetUpTetPreview <<< " + thisP + "   betweenHere.x " + betweenHere.x + " betweenHere.y " + betweenHere.y);
-
         for (int i = betweenHere.x; i < betweenHere.y; i++)
         {
             // yes tet loc
@@ -772,7 +696,6 @@ public class Tetris : MonoBehaviour
                     yesTetLoc = true;
                 }
             }
-            // yesTetLoc = true;
             if (!yesTetLoc)
             {
                 allPP[i].GetComponent<Image>().sprite = emptySprite;

@@ -1,45 +1,37 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEditorInternal;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
 
 public class Tetrimino : Tetris
 {
-
     // my piece directions from anchor
     public List<Vector2Int> mPDir = new List<Vector2Int>();
     // my piece locations
     public List<int> mPL = new List<int>();
     // my test piece locations
     public List<int> mTPL = new List<int>();
-
     // my shape
     public TetShape mS;
     // rotation state
     public int rotS = 0;
     // last good rotation state
     public int lSRotS = 0;
-
     // the 'anchor position' of the tetriminio for the I in a certain rotation it is empty space
     public int anchorPos = 0;
-
     public Color mColor = Color.white;
     public PieceState mPS;
-
     // make sure fully set up before falling
     public bool imSet = false;
-
     public bool lastMoveWasRotate = false;
+    private Tetris mTetris;
 
-
-    // Start is called before the first frame update
-
+    private void Awake()
+    {
+        mTetris = transform.GetComponent<Tetris>();
+    }
     // set up tet for preview
     public void SetUpPreviewTet(int thisP, TetShape tS)
     {
-        //UnityEngine.Debug.Log(" SetUpPreviewTet " + thisP + " shape " + tS);
         List <Vector2Int> tI = new List<Vector2Int>();
         Color tCP = Color.white;
         switch (tS)
@@ -81,7 +73,6 @@ public class Tetrimino : Tetris
                 break;
             case TetShape.T:
                 tCP = new Color(0.5f, 0.0f, 0.5f, 1.0f);// purple
-                //mColor = Color.magenta;
                 tI.Add(new Vector2Int(0, 1));
                 tI.Add(new Vector2Int(-1, 0));
                 tI.Add(new Vector2Int(0, 0));
@@ -95,13 +86,12 @@ public class Tetrimino : Tetris
                 tI.Add(new Vector2Int(1, 0));
                 break;
         }
-        Tetris mTetris = transform.GetComponent<Tetris>();
+        
         mTetris.SetUpTetPreview(thisP, tI, tCP);
     }
     // set up tet to drop
     public void SetUpTet(TetShape tS, int sP)
     {
-
         anchorPos = sP;
         mS = tS;
         mPL.Clear();
@@ -167,7 +157,6 @@ public class Tetrimino : Tetris
                 mPDir.Add(new Vector2Int(1, 0));
                 break;
         }
-
         foreach (Vector2Int dInfo in mPDir)
         {
             Vector2Int useAsDInfo = new Vector2Int(0, 0);
@@ -194,29 +183,15 @@ public class Tetrimino : Tetris
 
             mPL.Add(addThis);
         }
-
-
-
         lSRotS = rotS;
-
         mTetState = TetState.Falling;
         // immediate fall happens here -- 
-
         DropDown();
-
-
-       // Debug.Log("Set up new tet: " + mS.ToString());
         imSet = true;
-
-
-        // DrawGameState();
-
-
     }
     public void RotateTet(string thisDir)
     {
         int setRot = rotS;
-
         if (mS == TetShape.O)
         {
             return;
@@ -237,22 +212,61 @@ public class Tetrimino : Tetris
         {
             setRot = 0;
         }
-
-        bool blocked = TestNewRot(setRot);
-        if (!blocked)
+        // quick fix for I shape wall kicks
+        if (mS == TetShape.I)
+        {
+            if (setRot == 0)
+                setRot = 2;
+            if (setRot == 1)
+                setRot = 3;
+        }
+        string blocked = TestNewRot(setRot);
+        // try to 'wall kick'
+        int orRestore = 0;
+        if (blocked == "blockedleft")
+        {
+            aTAP++;
+            orRestore--;
+        }
+        else if (blocked == "blockedright")
+        {
+            aTAP--;
+            orRestore++;
+        }
+        blocked = TestNewRot(setRot);
+        // move over twice?
+        if (mS == TetShape.I || mS == TetShape.J || mS == TetShape.L)
+        {
+            if (blocked == "blockedleft")
+            {
+                aTAP++;
+                orRestore--;
+            }
+            else if (blocked == "blockedright")
+            {
+                aTAP--;
+                orRestore++;
+            }
+            blocked = TestNewRot(setRot);
+        }
+        // blocked in new wall kick and rotated position?
+        if (blocked == "")
         {
             lastMoveWasRotate = true;
             rotS = setRot;
-            //UnityEngine.Debug.Log("rotate tet: " + thisDir);
-            SetUpTet(mS, anchorPos);
+            SetUpTet(mS, aTAP);
+        }
+        else
+        {
+            aTAP += orRestore;
         }
     }
 
-    public bool TestNewRot(int setRot)
+    public string TestNewRot(int setRot)
     {
-        mTPL.Clear();
-        bool blocked = false;
 
+        mTPL.Clear();
+        string blocked = ""; 
         foreach (Vector2Int dInfo in mPDir)
         {
             Vector2Int useAsDInfo = new Vector2Int(0, 0);
@@ -277,18 +291,14 @@ public class Tetrimino : Tetris
             addThis += useAsDInfo.y * cols;
             mTPL.Add(addThis);
         }
-
-
-
         Vector2Int onBothEdges = new Vector2Int(0, 0);
         for (int i = 0; i < mTPL.Count; i++)
         {
             int mATAP = GETATAP();
             int checkHere = mTPL[i] + mATAP;
-
             if (checkHere < 0 || checkHere >= tP)
             {
-                blocked = true;
+                blocked = "blocked";
                 return blocked;
             }
             // left edge
@@ -304,33 +314,56 @@ public class Tetrimino : Tetris
             // check if it hits a piece or tet ends up on both sides of the board
             if (onBothEdges.x == 1 && onBothEdges.y == 1)
             {
-                blocked = true;
+                Vector2Int co = OnCollumnRow(checkHere);
+                Vector2Int co2 = OnCollumnRow(mATAP);
+                if (co.x > co2.x)
+                {
+                    blocked = "blockedleft";
+                }
+                else
+                {
+                    blocked = "blockedright";
+                }
                 return blocked;
             }
             // check if rotates into non empty space
             bool seeBlocked = true;
             if (checkHere >= 0 && checkHere < aPS.Count)
             {
-                //Debug.Log(" aPS[checkHere]: " + aPS[checkHere] + " checkHere: " + checkHere);
+                // piece is blocking this position
                 if (aPS[checkHere] != PieceState.Empty)
                 {
-                    blocked = true;
+                    Vector2Int co = OnCollumnRow(checkHere);
+                    Vector2Int co2 = OnCollumnRow(mATAP);
+                    if (co.x < co2.x)
+                    {
+                        blocked = "blockedleft";
+                    }
+                    else
+                    {
+                        blocked = "blockedright";
+                    }
                     return blocked;
                 }
             }
             if (seeBlocked = CheckPieceSpaceBlocked(checkHere))
             {
-                blocked = true;
+                blocked = "blocked";
                 return blocked;
             }
 
         }
-
-
         return blocked;
     }
 
-
-
-
+    public Vector2Int OnCollumnRow(int thisLoc)
+    {
+        Vector2Int mCR = new Vector2Int(thisLoc, 0);
+        while (mCR.x >= cols)
+        {
+            mCR.x -= cols;
+            mCR.y++;
+        }
+        return mCR;
+    }
 }
